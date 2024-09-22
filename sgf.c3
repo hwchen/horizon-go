@@ -1,4 +1,7 @@
-//TODO skip whitespace
+// TODO test more variations
+// TODO parse out move position from props
+// TODO skip whitespace (do I care?)
+// TODO escape strings
 module sgf;
 
 import std::collections::list;
