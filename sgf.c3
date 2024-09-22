@@ -50,7 +50,7 @@ fn GameTree! parse_sgf(String src, Allocator alloc) {
 				if (stack.len() == 0) {
 					return { .root = n };
 				} else {
-					parent = stack.last()!;
+					parent = n;
 				}
 			}
 			p.match(";");
@@ -169,4 +169,15 @@ fn void! test_no_variation() @test {
 fn void! test_one_variation() @test {
 	String input = "(;FF[4]GM[1]SZ[19];B[aa];W[bb](;B[cc];W[dd];B[ad];W[bd])(;B[hh];W[hg]))";
 	GameTree gt = parse_sgf(input, allocator::heap())!;
+	// root has only one child
+	assert(gt.root.children.len() == 1);
+	// first move node has only one child
+	Node* node = gt.root.children[0];
+	assert(node.children.len() == 1);
+	// second move node has two children
+	node = node.children[0];
+	assert(node.children.len() == 2);
 }
+
+// test two variations
+// test nested variations
