@@ -125,6 +125,14 @@ fault ParseError {
 	EXPECTED_PROP,
 }
 
+fn void! test_empty() @test {
+	String input = "(;)";
+	GameTree gt = parse_sgf(input, allocator::heap())!;
+	// root has no children
+	assert(gt.root.children.len() == 0);
+	assert(gt.root.props.len() == 0);
+}
+
 fn void! test_root_only() @test {
 	String input = "(;FF[4])";
 	GameTree gt = parse_sgf(input, allocator::heap())!;
