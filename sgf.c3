@@ -4,6 +4,7 @@ import std::collections::list;
 import std::core::array;
 import std::core::mem::allocator;
 import std::core::mem;
+import std::io;
 
 def Props = List(<Prop>);
 def Nodes = List(<Node*>);
@@ -28,8 +29,8 @@ enum Player {
 	WHITE,
 }
 
-fn Game! parse_sgf(String input, Allocator alloc) {
-	Parser p;
+fn Game! parse_sgf(String src, Allocator alloc) {
+	Parser p = { .src = src };
 	Game game;
 	Nodes children;
 	children.new_init();
@@ -40,10 +41,11 @@ fn Game! parse_sgf(String input, Allocator alloc) {
 
 	// parse root metadata
 	p.expect("(;")!;
-	if (p.peek()! != ';' || p.peek()! != '(' || p.peek()! != ')') {
+	while (p.peek()! != ';' && p.peek()! != '(' && p.peek()! != ')') {
 		Prop prop = p.prop(alloc)!;
 		game.props.push(prop);
 	}
+	io::printfn("finished parsing root metadata");
 
 	// parse root children
 	// stack tracks scopes; A node is put on here if it's the parent of a new scope
@@ -65,7 +67,7 @@ fn Game! parse_sgf(String input, Allocator alloc) {
 
 			Props props;
 			props.new_init();
-			if (p.peek()! != ';' || p.peek()! != '(' || p.peek()! != ')') {
+			while (p.peek()! != ';' && p.peek()! != '(' && p.peek()! != ')') {
 				Prop prop = p.prop(alloc)!;
 				props.push(prop);
 			}
@@ -87,7 +89,7 @@ fn Game! parse_sgf(String input, Allocator alloc) {
 }
 
 struct Parser {
-	int curr;
+	usz curr;
 	char[] src;
 }
 
@@ -102,7 +104,7 @@ fn bool Parser.match(&p, String s) {
 }
 fn void! Parser.expect(&p, String s) {
 	if (s == p.src[p.curr:s.len]) {
-		p.curr += 1;
+		p.curr += s.len;
 	} else {
 		return ParseError.UNEXPECTED?;
 	}
@@ -120,9 +122,11 @@ fn Prop! Parser.prop(&p, Allocator alloc) {
 		return ParseError.EXPECTED_PROP?;
 	}
 	Prop prop = {
-		.label = ((String)p.src[p.curr:split_idx]).copy(),
-		.data = ((String)p.src[split_idx + 1:end_idx]).copy(),
+		.label = ((String)p.src[p.curr: split_idx]).copy(),
+		.data = ((String)p.src[p.curr + split_idx + 1:end_idx - split_idx - 1]).copy(),
 	};
+	io::printfn("Prop: %s, %s", prop.label, prop.data);
+	p.curr += end_idx + 1;
 	return prop;
 }
 
