@@ -35,23 +35,23 @@ enum Player {
 
 fn GameTree! parse_sgf(String src, Allocator alloc) {
 	Parser p = { .src = src };
-	Node* root = mem::new(Node);;
-	root.children.new_init();
 
 	// stack tracks scopes; A node is put on here if it's the parent of a new scope
 	Nodes stack;
 	stack.temp_init();
-	Node* parent = root;
+	Node* parent;
 	@pool() { // TODO can I use defer/free the stack?
 		while(true) {
 			if (p.match("(")) {
 				stack.push(parent);
 			}
 			if (p.match(")")) {
-				stack.pop()!;
-				Node*! last = stack.last();
-				if (catch last) break;
-				parent = last;
+				Node* n = stack.pop()!;
+				if (stack.len() == 0) {
+					return { .root = n };
+				} else {
+					parent = stack.last()!;
+				}
 			}
 			p.match(";");
 
@@ -63,12 +63,16 @@ fn GameTree! parse_sgf(String src, Allocator alloc) {
 			}
 
 			Node* node = mem::new(Node, { .props = props });
-			parent.children.push(node);
+			if (parent == null) {
+				// first time through, need to set root
+				stack[0] = node;
+			} else {
+				parent.children.push(node);
+			}
 			parent = node;
 			//io::printfn("stack_len: %d, Rest: %s", stack.len(), p.src[p.curr..]);
 		}
 	};
-	return { .root = root };
 }
 
 struct Parser {
@@ -121,14 +125,25 @@ fault ParseError {
 	EXPECTED_PROP,
 }
 
+fn void! test_root_only() @test {
+	String input = "(;FF[4])";
+	GameTree gt = parse_sgf(input, allocator::heap())!;
+	// root has no children
+	assert(gt.root.children.len() == 0);
+}
+
+fn void! test_one_move() @test {
+	String input = "(;FF[4];B[aa])";
+	GameTree gt = parse_sgf(input, allocator::heap())!;
+	// root has one child
+	assert(gt.root.children.len() == 1);
+}
+
 fn void! test_no_variation() @test {
 	String input = "(;FF[4]GM[1]SZ[19];B[aa];W[bb];B[cc];W[dd];B[ad];W[bd])";
 	GameTree gt = parse_sgf(input, allocator::heap())!;
 	// root has only one child
 	assert(gt.root.children.len() == 1);
-	foreach (prop : gt.root.props) {
-		io::printfn("Prop: %s %s", prop.label, prop.data);
-	}
 	// first move node has only one child
 	Node* node = gt.root.children[0];
 	assert(node.children.len() == 1);
