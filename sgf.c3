@@ -1,3 +1,4 @@
+//TODO skip whitespace
 module sgf;
 
 import std::collections::list;
@@ -9,9 +10,9 @@ import std::io;
 def Props = List(<Prop>);
 def Nodes = List(<Node*>);
 
-struct Game {
-	Props props;
-	Nodes children;
+// Tree of games. One tree can hold multiple games.
+struct GameTree {
+	Node* root;
 }
 
 struct Node {
@@ -29,38 +30,24 @@ enum Player {
 	WHITE,
 }
 
-fn Game! parse_sgf(String src, Allocator alloc) {
+fn GameTree! parse_sgf(String src, Allocator alloc) {
 	Parser p = { .src = src };
-	Game game;
-	Nodes children;
-	children.new_init();
-	Props game_props;
-	game_props.new_init();
-	game.children = children;
-	game.props = game_props;
+	Node* root = mem::new(Node);;
+	root.children.new_init();
 
-	// parse root metadata
-	p.expect("(;")!;
-	while (p.peek()! != ';' && p.peek()! != '(' && p.peek()! != ')') {
-		Prop prop = p.prop(alloc)!;
-		game.props.push(prop);
-	}
-
-	// parse root children
 	// stack tracks scopes; A node is put on here if it's the parent of a new scope
 	Nodes stack;
 	stack.temp_init();
-	Node* parent;
+	stack.push(root);
+	Node* parent = root;
 	@pool() { // TODO can I use defer/free the stack?
-		while(true) {
+		while(stack.len() != 0) {
 			if (p.match("(")) {
 				stack.push(parent);
 			}
 			if (p.match(")")) {
 				stack.pop()!;
-				Node*! last = stack.last();
-				if (catch last) break;
-				parent = last;
+				parent = stack.last()!;
 			}
 			if (!p.match(";")) break;
 
@@ -72,19 +59,14 @@ fn Game! parse_sgf(String src, Allocator alloc) {
 			}
 
 			Node* node = mem::new(Node, { .props = props });
-			if (parent == null) {
-				game.children.push(node);
-			} else {
-				parent.children.push(node);
-			}
+			parent.children.push(node);
 			parent = node;
-
-			if (stack.len() == 0 && p.peek()! == ')') break;
 		}
 	};
+	io::printfn("%s", p.src[p.curr..]);
 	p.expect(")")!;
 
-	return game;
+	return { .root = root };
 }
 
 struct Parser {
@@ -93,6 +75,9 @@ struct Parser {
 }
 
 fn bool Parser.match(&p, String s) {
+	if (p.curr + s.len >= p.src.len) {
+		return false;
+	}
 	if (s == p.src[p.curr:s.len]) {
 		p.curr += 1;
 		return true;
@@ -136,14 +121,14 @@ fault ParseError {
 
 fn void! test_no_variation() @test {
 	String input = "(;FF[4]GM[1]SZ[19];B[aa];W[bb];B[cc];W[dd];B[ad];W[bd])";
-	Game game = parse_sgf(input, allocator::heap())!;
+	GameTree gt = parse_sgf(input, allocator::heap())!;
 	// root has only one child
-	assert(game.children.len() == 1);
-	// first node has only one child
-	Node* node = game.children[0];
+	assert(gt.root.children.len() == 1);
+	// root node has only one child
+	Node* node = gt.root.children[0];
 	assert(node.children.len() == 1);
-	// next four nodes have only one child
-	for (int i; i < 4; i += 1) {
+	// next five nodes have only one child
+	for (int i; i < 5; i += 1) {
 		node = node.children[0];
 		assert(node.children.len() == 1);
 	}
@@ -151,4 +136,9 @@ fn void! test_no_variation() @test {
 	node = node.children[0];
 	assert(node.children.len() == 0);
 	// TODO refactor, there's got to be a cleaner way to test
+}
+
+fn void! test_one_variation() @test {
+	String input = "(;FF[4]GM[1]SZ[19];B[aa];W[bb](;B[cc];W[dd];B[ad];W[bd])(;B[hh];W[hg]))";
+	GameTree gt = parse_sgf(input, allocator::heap())!;
 }
