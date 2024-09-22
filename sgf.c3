@@ -1,6 +1,7 @@
 module sgf;
 
 import std::collections::list;
+import std::core::array;
 import std::core::mem::allocator;
 import std::core::mem;
 
@@ -40,7 +41,7 @@ fn Game! parse_sgf(String input, Allocator alloc) {
 	// parse root metadata
 	p.expect("(;")!;
 	if (p.peek()! != ';' || p.peek()! != '(' || p.peek()! != ')') {
-		Prop prop = p.prop()!;
+		Prop prop = p.prop(alloc)!;
 		game.props.push(prop);
 	}
 
@@ -65,7 +66,7 @@ fn Game! parse_sgf(String input, Allocator alloc) {
 			Props props;
 			props.new_init();
 			if (p.peek()! != ';' || p.peek()! != '(' || p.peek()! != ')') {
-				Prop prop = p.prop()!;
+				Prop prop = p.prop(alloc)!;
 				props.push(prop);
 			}
 
@@ -90,17 +91,47 @@ struct Parser {
 	char[] src;
 }
 
-fn bool Parser.match(&p, String s) { return false; }
-fn void! Parser.expect(&p, String s) { return; }
-fn char! Parser.peek(&p) { return 'a'; }
-fn int! Parser.number(&p) { return 0; }
-fn Prop! Parser.prop(&p) {
-	Prop prop;
+fn bool Parser.match(&p, String s) {
+	if (s == p.src[p.curr:s.len]) {
+		p.curr += 1;
+		return true;
+	} else {
+		return false;
+	}
+
+}
+fn void! Parser.expect(&p, String s) {
+	if (s == p.src[p.curr:s.len]) {
+		p.curr += 1;
+	} else {
+		return ParseError.UNEXPECTED?;
+	}
+}
+fn char! Parser.peek(&p) {
+	return p.src[p.curr];
+}
+fn Prop! Parser.prop(&p, Allocator alloc) {
+	usz! split_idx = array::index_of(p.src[p.curr..], '[');
+	usz! end_idx = array::index_of(p.src[p.curr..], ']');
+	if (catch split_idx) {
+		return ParseError.EXPECTED_PROP?;
+	}
+	if (catch end_idx) {
+		return ParseError.EXPECTED_PROP?;
+	}
+	Prop prop = {
+		.label = ((String)p.src[p.curr:split_idx]).copy(),
+		.data = ((String)p.src[split_idx + 1:end_idx]).copy(),
+	};
 	return prop;
 }
 
-enum ParseError {
-	EXPECTED_MATCH,
-	EXPECTED_NUMBER,
-	EXPECTED_STRING,
+fault ParseError {
+	UNEXPECTED,
+	EXPECTED_PROP,
+}
+
+fn void! test_no_variation() @test {
+	String input = "(;FF[4]GM[1]SZ[19];B[aa];W[bb];B[cc];W[dd];B[ad];W[bd])";
+	parse_sgf(input, allocator::heap())!;
 }
