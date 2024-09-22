@@ -45,7 +45,6 @@ fn Game! parse_sgf(String src, Allocator alloc) {
 		Prop prop = p.prop(alloc)!;
 		game.props.push(prop);
 	}
-	io::printfn("finished parsing root metadata");
 
 	// parse root children
 	// stack tracks scopes; A node is put on here if it's the parent of a new scope
@@ -85,7 +84,7 @@ fn Game! parse_sgf(String src, Allocator alloc) {
 	};
 	p.expect(")")!;
 
-	return { .children = children };
+	return game;
 }
 
 struct Parser {
@@ -125,7 +124,7 @@ fn Prop! Parser.prop(&p, Allocator alloc) {
 		.label = ((String)p.src[p.curr: split_idx]).copy(),
 		.data = ((String)p.src[p.curr + split_idx + 1:end_idx - split_idx - 1]).copy(),
 	};
-	io::printfn("Prop: %s, %s", prop.label, prop.data);
+	//io::printfn("Prop: %s, %s", prop.label, prop.data);
 	p.curr += end_idx + 1;
 	return prop;
 }
@@ -137,5 +136,19 @@ fault ParseError {
 
 fn void! test_no_variation() @test {
 	String input = "(;FF[4]GM[1]SZ[19];B[aa];W[bb];B[cc];W[dd];B[ad];W[bd])";
-	parse_sgf(input, allocator::heap())!;
+	Game game = parse_sgf(input, allocator::heap())!;
+	// root has only one child
+	assert(game.children.len() == 1);
+	// first node has only one child
+	Node* node = game.children[0];
+	assert(node.children.len() == 1);
+	// next four nodes have only one child
+	for (int i; i < 4; i += 1) {
+		node = node.children[0];
+		assert(node.children.len() == 1);
+	}
+	// last node has no child
+	node = node.children[0];
+	assert(node.children.len() == 0);
+	// TODO refactor, there's got to be a cleaner way to test
 }
