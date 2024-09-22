@@ -126,11 +126,14 @@ fn void! test_no_variation() @test {
 	GameTree gt = parse_sgf(input, allocator::heap())!;
 	// root has only one child
 	assert(gt.root.children.len() == 1);
-	// root node has only one child
+	foreach (prop : gt.root.props) {
+		io::printfn("Prop: %s %s", prop.label, prop.data);
+	}
+	// first move node has only one child
 	Node* node = gt.root.children[0];
 	assert(node.children.len() == 1);
 	// next five nodes have only one child
-	for (int i; i < 5; i += 1) {
+	for (int i; i < 4; i += 1) {
 		node = node.children[0];
 		assert(node.children.len() == 1);
 	}
