@@ -38,18 +38,19 @@ fn GameTree! parse_sgf(String src, Allocator alloc) {
 	// stack tracks scopes; A node is put on here if it's the parent of a new scope
 	Nodes stack;
 	stack.temp_init();
-	stack.push(root);
 	Node* parent = root;
 	@pool() { // TODO can I use defer/free the stack?
-		while(stack.len() != 0) {
+		while(true) {
 			if (p.match("(")) {
 				stack.push(parent);
 			}
 			if (p.match(")")) {
 				stack.pop()!;
-				parent = stack.last()!;
+				Node*! last = stack.last();
+				if (catch last) break;
+				parent = last;
 			}
-			if (!p.match(";")) break;
+			p.match(";");
 
 			Props props;
 			props.new_init();
@@ -61,11 +62,9 @@ fn GameTree! parse_sgf(String src, Allocator alloc) {
 			Node* node = mem::new(Node, { .props = props });
 			parent.children.push(node);
 			parent = node;
+			//io::printfn("stack_len: %d, Rest: %s", stack.len(), p.src[p.curr..]);
 		}
 	};
-	io::printfn("%s", p.src[p.curr..]);
-	p.expect(")")!;
-
 	return { .root = root };
 }
 
@@ -75,7 +74,7 @@ struct Parser {
 }
 
 fn bool Parser.match(&p, String s) {
-	if (p.curr + s.len >= p.src.len) {
+	if (p.curr + s.len > p.src.len) {
 		return false;
 	}
 	if (s == p.src[p.curr:s.len]) {
