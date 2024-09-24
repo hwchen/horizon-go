@@ -3,3 +3,6 @@ build *args="":
 
 test-sgf:
     c3c compile-test sgf.c3
+
+valgrind:
+    just build && valgrind --track-origins=yes --leak-check=full --leak-resolution=high ./horizon

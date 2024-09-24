@@ -33,14 +33,18 @@ enum Player {
 	WHITE,
 }
 
+// instead of pool, just define a temp arena? Behavior is not clear,
+// especially if there's nested pools (a temp alloc gets passed in)
 fn GameTree! parse_sgf(String src, Allocator alloc) {
 	Parser p = { .src = src };
 
-	// stack tracks scopes; A node is put on here if it's the parent of a new scope
-	Nodes stack;
-	stack.temp_init();
-	Node* parent;
-	@pool() { // TODO can I use defer/free the stack?
+	@pool(alloc) {
+		// stack tracks scopes; A node is put on here
+		// if it's the parent of a new scope
+		Nodes stack;
+		stack.temp_init();
+		Node* parent;
+
 		while(true) {
 			if (p.match("(")) {
 				stack.push(parent);
@@ -56,13 +60,14 @@ fn GameTree! parse_sgf(String src, Allocator alloc) {
 			p.match(";");
 
 			Props props;
-			props.new_init();
+			props.new_init(allocator:alloc);
 			while (p.peek()! != ';' && p.peek()! != '(' && p.peek()! != ')') {
 				Prop prop = p.prop(alloc)!;
 				props.push(prop);
 			}
 
-			Node* node = mem::new(Node, { .props = props });
+			Node* node = allocator::new(alloc, Node, { .props = props });
+			node.children.new_init(allocator:alloc);
 			if (parent == null) {
 				// first time through, need to set root
 				stack[0] = node;
@@ -112,8 +117,8 @@ fn Prop! Parser.prop(&p, Allocator alloc) {
 		return ParseError.EXPECTED_PROP?;
 	}
 	Prop prop = {
-		.label = ((String)p.src[p.curr: split_idx]).copy(),
-		.data = ((String)p.src[p.curr + split_idx + 1:end_idx - split_idx - 1]).copy(),
+		.label = ((String)p.src[p.curr: split_idx]).copy(allocator:alloc),
+		.data = ((String)p.src[p.curr + split_idx + 1:end_idx - split_idx - 1]).copy(allocator:alloc),
 	};
 	//io::printfn("Prop: %s, %s", prop.label, prop.data);
 	p.curr += end_idx + 1;
@@ -138,6 +143,16 @@ fn void! test_root_only() @test {
 	GameTree gt = parse_sgf(input, allocator::heap())!;
 	// root has no children
 	assert(gt.root.children.len() == 0);
+}
+
+fn void! test_nested_temp_allocators() @test {
+	// there's a pool here, and another pool in parse_sgf
+	String input = "(;FF[4])";
+	@pool() {
+		GameTree gt = parse_sgf(input, allocator::temp())!;
+		// root has no children
+		assert(gt.root.children.len() == 0);
+	};
 }
 
 fn void! test_one_move() @test {
