@@ -9,7 +9,7 @@ fn void! main() {
 
 	DynamicArenaAllocator arena;
 	arena.init(1024, allocator::heap());
-	for (int i = 0; i < 100000; i += 1) {
+	for (int i = 0; i < 10; i += 1) {
 		GameTree gt = sgf::parse_sgf(input, &arena)!;
 		defer arena.free();
 	}

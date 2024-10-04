@@ -38,46 +38,45 @@ enum Player {
 fn GameTree! parse_sgf(String src, Allocator alloc) {
 	Parser p = { .src = src };
 
-	@pool(alloc) {
-		// stack tracks scopes; A node is put on here
-		// if it's the parent of a new scope
-		Nodes stack;
-		stack.temp_init();
-		Node* parent;
+	// stack tracks scopes; A node is put on here
+	// if it's the parent of a new scope
+	Nodes stack;
+	stack.temp_init();
+	defer stack.free();
+	Node* parent;
 
-		while(true) {
-			if (p.match("(")) {
-				stack.push(parent);
-			}
-			if (p.match(")")) {
-				Node* n = stack.pop()!;
-				if (stack.len() == 0) {
-					return { .root = n };
-				} else {
-					parent = n;
-				}
-			}
-			p.match(";");
-
-			Props props;
-			props.new_init(allocator:alloc);
-			while (p.peek()! != ';' && p.peek()! != '(' && p.peek()! != ')') {
-				Prop prop = p.prop(alloc)!;
-				props.push(prop);
-			}
-
-			Node* node = allocator::new(alloc, Node, { .props = props });
-			node.children.new_init(allocator:alloc);
-			if (parent == null) {
-				// first time through, need to set root
-				stack[0] = node;
-			} else {
-				parent.children.push(node);
-			}
-			parent = node;
-			//io::printfn("stack_len: %d, Rest: %s", stack.len(), p.src[p.curr..]);
+	while(true) {
+		if (p.match("(")) {
+			stack.push(parent);
 		}
-	};
+		if (p.match(")")) {
+			Node* n = stack.pop()!;
+			if (stack.len() == 0) {
+				return { .root = n };
+			} else {
+				parent = n;
+			}
+		}
+		p.match(";");
+
+		Props props;
+		props.new_init(allocator:alloc);
+		while (p.peek()! != ';' && p.peek()! != '(' && p.peek()! != ')') {
+			Prop prop = p.prop(alloc)!;
+			props.push(prop);
+		}
+
+		Node* node = allocator::new(alloc, Node, { .props = props });
+		node.children.new_init(allocator:alloc);
+		if (parent == null) {
+			// first time through, need to set root
+			stack[0] = node;
+		} else {
+			parent.children.push(node);
+		}
+		parent = node;
+		//io::printfn("stack_len: %d, Rest: %s", stack.len(), p.src[p.curr..]);
+	}
 }
 
 struct Parser {
