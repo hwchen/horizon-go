@@ -33,8 +33,6 @@ enum Player {
 	WHITE,
 }
 
-// instead of pool, just define a temp arena? Behavior is not clear,
-// especially if there's nested pools (a temp alloc gets passed in)
 fn GameTree! parse_sgf(String src, Allocator alloc) {
 	Parser p = { .src = src };
 
